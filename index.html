@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة متابعة أداء عقود التشغيل والصيانة - أمانة منطقة الرياض</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .metric-card {
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .gauge-container {
+            position: relative;
+            width: 200px;
+            height: 120px;
+            margin: 0 auto;
+        }
+        
+        .gauge-bg {
+            stroke: #e5e7eb;
+            stroke-width: 12;
+            fill: none;
+        }
+        
+        .gauge-fill {
+            stroke-width: 12;
+            fill: none;
+            stroke-linecap: round;
+            transition: stroke-dasharray 1s ease;
+        }
+        
+        .status-excellent { color: #059669; background-color: #d1fae5; }
+        .status-good { color: #0891b2; background-color: #cffafe; }
+        .status-warning { color: #d97706; background-color: #fed7aa; }
+        .status-danger { color: #dc2626; background-color: #fecaca; }
+        
+        .upload-area {
+            border: 3px dashed #cbd5e1;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+        
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        }
+        
+        .nav-tab {
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .nav-tab.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            border-bottom-color: #1e40af;
+        }
+        
+        .nav-tab:not(.active):hover {
+            background-color: #f1f5f9;
+            border-bottom-color: #cbd5e1;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .slide-in {
+            animation: slideIn 0.5s ease;
+        }
+        
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        
+        .filter-section {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 min-h-screen">
+    <!-- Header -->
+    <div class="bg-white shadow-lg border-b-4 border-blue-600">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <div class="bg-blue-600 p-3 rounded-full">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">لوحة متابعة أداء عقود التشغيل والصيانة</h1>
+                        <p class="text-gray-600">أمانة منطقة الرياض - وحدة دعم بلديات المنطقة</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-sm text-gray-600" id="lastUpdate">
+                        آخر تحديث: --
+                    </div>
+                    <button onclick="exportToGoogleSheets()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span>تصدير إلى Google Sheets</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-6 py-8">
+        <!-- File Upload Section -->
+        <div id="uploadSection" class="mb-8">
+            <div class="upload-area rounded-xl p-12 text-center" id="uploadArea">
+                <div class="mb-6">
+                    <svg class="mx-auto h-16 w-16 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-3">ارفع ملف بيانات الأداء</h3>
+                <p class="text-gray-600 mb-6">اسحب ملف الإكسل الخاص بوحدة دعم بلديات المنطقة هنا أو اضغط للاختيار</p>
+                <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden">
+                <button onclick="document.getElementById('fileInput').click()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg transition-colors text-lg font-medium">
+                    اختيار ملف البيانات
+                </button>
+                <p class="text-sm text-gray-500 mt-4">يدعم ملفات .xlsx, .xls, .csv</p>
+            </div>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboardContent" class="hidden">
+            <!-- Navigation Tabs -->
+            <div class="bg-white rounded-xl shadow-sm mb-8 overflow-hidden">
+                <div class="flex">
+                    <button class="nav-tab active flex-1 px-6 py-4 font-medium" onclick="switchTab('summary')" id="summaryTab">
+                        المؤشرات الرئيسية (KPIs)
+                    </button>
+                    <button class="nav-tab flex-1 px-6 py-4 font-medium" onclick="switchTab('category')" id="categoryTab">
+                        تصنيف الأداء حسب النوع
+                    </button>
+                    <button class="nav-tab flex-1 px-6 py-4 font-medium" onclick="switchTab('vendor')" id="vendorTab">
+                        تصنيف الأداء حسب المقاول
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters Section -->
+            <div class="filter-section">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">تاريخ التقرير</label>
+                        <input type="date" id="dateFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">المهندس المشرف</label>
+                        <select id="engineerFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">جميع المهندسين</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">نوع العقد/العمل</label>
+                        <select id="contractTypeFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">جميع الأنواع</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="applyFilters()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            تطبيق الفلاتر
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            
+            <!-- Summary Tab -->
+            <div id="summaryContent" class="tab-content">
+                <!-- Key Metrics Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="metric-card rounded-xl p-6 shadow-lg border border-gray-100">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">نسبة الإنجاز الإجمالية</h3>
+                            <div class="bg-green-100 p-2 rounded-full">
+                                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="gauge-container">
+                            <svg width="200" height="120" class="gauge">
+                                <path class="gauge-bg" d="M 30 90 A 70 70 0 0 1 170 90"></path>
+                                <path class="gauge-fill" id="completionGauge" d="M 30 90 A 70 70 0 0 1 170 90" stroke="#10b981"></path>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="text-center">
+                                    <div class="text-3xl font-bold text-gray-800" id="completionRate">0%</div>
+                                    <div class="text-sm text-gray-600">معدل الإنجاز</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card rounded-xl p-6 shadow-lg border border-gray-100">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">نسبة المدة المنقضية</h3>
+                            <div class="bg-blue-100 p-2 rounded-full">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="gauge-container">
+                            <svg width="200" height="120" class="gauge">
+                                <path class="gauge-bg" d="M 30 90 A 70 70 0 0 1 170 90"></path>
+                                <path class="gauge-fill" id="timeGauge" d="M 30 90 A 70 70 0 0 1 170 90" stroke="#3b82f6"></path>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="text-center">
+                                    <div class="text-3xl font-bold text-gray-800" id="timeElapsed">0%</div>
+                                    <div class="text-sm text-gray-600">المدة المنقضية</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card rounded-xl p-6 shadow-lg border border-gray-100">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">معدل الانحراف الكلي</h3>
+                            <div class="bg-orange-100 p-2 rounded-full">
+                                <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-4xl font-bold mb-2" id="deviationRate">0%</div>
+                            <div class="text-sm text-gray-600 mb-4">معدل الانحراف</div>
+                            <div class="flex justify-center space-x-2">
+                                <span class="px-3 py-1 rounded-full text-xs font-medium" id="deviationStatus">متوازن</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card rounded-xl p-6 shadow-lg border border-gray-100">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800">المؤشر المالي</h3>
+                            <div class="bg-purple-100 p-2 rounded-full">
+                                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">المستهدف:</span>
+                                <span class="font-bold text-green-600" id="targetFinancial">0 ر.س</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">الفعلي:</span>
+                                <span class="font-bold text-blue-600" id="actualFinancial">0 ر.س</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">الانحراف:</span>
+                                <span class="font-bold" id="financialDeviation">0 ر.س</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Comparison Chart -->
+                <div class="bg-white rounded-xl p-6 shadow-lg border border-gray-100 mb-8">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6">مقارنة الإنجاز مع المدة المنقضية</h3>
+                    <div class="h-80">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category Tab -->
+            <div id="categoryContent" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <!-- Performance by Work Type -->
+                    <div class="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-6">الأداء حسب نوع العمل</h3>
+                        <div class="h-80">
+                            <canvas id="workTypeChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Performance by Contract Type -->
+                    <div class="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-6">الأداء حسب نوع العقد</h3>
+                        <div class="h-80">
+                            <canvas id="contractTypeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Category Performance Table -->
+                <div class="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6">تفاصيل الأداء حسب التصنيف</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b-2 border-gray-200 bg-gray-50">
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">نوع العمل/العقد</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">عدد العقود</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">نسبة الإنجاز</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">نسبة المدة المنقضية</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">معدل الانحراف</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">المؤشر المالي</th>
+                                </tr>
+                            </thead>
+                            <tbody id="categoryTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center py-8 text-gray-500">لا توجد بيانات</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vendor Tab -->
+            <div id="vendorContent" class="tab-content hidden">
+                <!-- Vendor Performance Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">المقاولون المتقدمون</h4>
+                        <div class="text-3xl font-bold text-green-600 mb-2" id="advancedVendors">0</div>
+                        <p class="text-sm text-gray-600">متقدم عن الجدول الزمني</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">المقاولون في الموعد</h4>
+                        <div class="text-3xl font-bold text-blue-600 mb-2" id="onTimeVendors">0</div>
+                        <p class="text-sm text-gray-600">في الموعد المحدد</p>
+                    </div>
+                    <div class="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">المقاولون المتأخرون</h4>
+                        <div class="text-3xl font-bold text-red-600 mb-2" id="delayedVendors">0</div>
+                        <p class="text-sm text-gray-600">متأخر عن الجدول الزمني</p>
+                    </div>
+                </div>
+
+                <!-- Vendor Performance Chart -->
+                <div class="bg-white rounded-xl p-6 shadow-lg border border-gray-100 mb-8">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6">أداء المقاولين</h3>
+                    <div class="h-96">
+                        <canvas id="vendorChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Detailed Contracts Table -->
+                <div class="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-semibold text-gray-800">تفاصيل العقود</h3>
+                        <div class="flex space-x-2">
+                            <select id="statusFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <option value="">جميع الحالات</option>
+                                <option value="متقدم">متقدم عن الجدول</option>
+                                <option value="في الموعد">في الموعد</option>
+                                <option value="متأخر">متأخر</option>
+                            </select>
+                            <button onclick="exportContractsData()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+                                تصدير البيانات
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b-2 border-gray-200 bg-gray-50">
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">رقم العقد</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">اسم المشروع</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">المقاول</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">نسبة الإنجاز</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">نسبة المدة المنقضية</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">معدل الانحراف</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">المهندس المشرف</th>
+                                    <th class="text-right py-4 px-4 font-semibold text-gray-700">الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contractsTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center py-8 text-gray-500">لا توجد بيانات</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let contractsData = [];
+        let filteredData = [];
+        let charts = {};
+
+        // File handling
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.getElementById('uploadArea');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    processContractsData(rawData);
+                    showDashboard();
+                    
+                } catch (error) {
+                    alert('خطأ في قراءة الملف: ' + error.message);
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processContractsData(rawData) {
+            if (rawData.length === 0) return;
+            
+            const headers = rawData[0];
+            const dataRows = rawData.slice(1).filter(row => row.some(cell => cell !== null && cell !== undefined && cell !== ''));
+            
+            // Smart column detection
+            const contractNumberIndex = findColumnIndex(headers, ['رقم العقد', 'العقد', 'contract', 'number']);
+            const projectNameIndex = findColumnIndex(headers, ['اسم المشروع', 'المشروع', 'project', 'name']);
+            const contractorIndex = findColumnIndex(headers, ['المقاول', 'contractor', 'vendor']);
+            const completionIndex = findColumnIndex(headers, ['نسبة الإنجاز', 'الإنجاز', 'completion', 'progress']);
+            const timeElapsedIndex = findColumnIndex(headers, ['نسبة المدة المنقضية', 'المدة المنقضية', 'time_elapsed', 'elapsed']);
+            const deviationIndex = findColumnIndex(headers, ['معدل الانحراف', 'الانحراف', 'deviation']);
+            const financialTargetIndex = findColumnIndex(headers, ['المؤشر المالي المستهدف', 'المستهدف', 'target']);
+            const financialActualIndex = findColumnIndex(headers, ['المؤشر المالي الفعلي', 'الفعلي', 'actual']);
+            const engineerIndex = findColumnIndex(headers, ['المهندس المشرف', 'المشرف', 'engineer', 'supervisor']);
+            const workTypeIndex = findColumnIndex(headers, ['نوع العمل', 'العمل', 'work_type', 'type']);
+            const contractTypeIndex = findColumnIndex(headers, ['نوع العقد', 'contract_type']);
+
+            contractsData = [];
+            const engineers = new Set();
+            const workTypes = new Set();
+            const contractTypes = new Set();
+
+            dataRows.forEach((row, index) => {
+                const completion = parseFloat(row[completionIndex]) || 0;
+                const timeElapsed = parseFloat(row[timeElapsedIndex]) || 0;
+                const deviation = parseFloat(row[deviationIndex]) || 0;
+                const financialTarget = parseFloat(row[financialTargetIndex]) || 0;
+                const financialActual = parseFloat(row[financialActualIndex]) || 0;
+                
+                const contract = {
+                    id: index + 1,
+                    contractNumber: row[contractNumberIndex] || `عقد-${index + 1}`,
+                    projectName: row[projectNameIndex] || `مشروع ${index + 1}`,
+                    contractor: row[contractorIndex] || 'غير محدد',
+                    completion: completion,
+                    timeElapsed: timeElapsed,
+                    deviation: deviation,
+                    financialTarget: financialTarget,
+                    financialActual: financialActual,
+                    financialDeviation: financialActual - financialTarget,
+                    engineer: row[engineerIndex] || 'غير محدد',
+                    workType: row[workTypeIndex] || 'غير محدد',
+                    contractType: row[contractTypeIndex] || 'غير محدد',
+                    status: getProjectStatus(completion, timeElapsed)
+                };
+
+                contractsData.push(contract);
+                
+                if (contract.engineer !== 'غير محدد') engineers.add(contract.engineer);
+                if (contract.workType !== 'غير محدد') workTypes.add(contract.workType);
+                if (contract.contractType !== 'غير محدد') contractTypes.add(contract.contractType);
+            });
+
+            // Populate filter dropdowns
+            populateFilterDropdown('engineerFilter', Array.from(engineers));
+            populateFilterDropdown('contractTypeFilter', Array.from(workTypes).concat(Array.from(contractTypes)));
+
+            filteredData = [...contractsData];
+            updateDashboard();
+            document.getElementById('lastUpdate').textContent = `آخر تحديث: ${new Date().toLocaleDateString('ar-SA')}`;
+        }
+
+        function findColumnIndex(headers, searchTerms) {
+            return headers.findIndex(header => {
+                if (!header) return false;
+                const headerStr = header.toString().toLowerCase().trim();
+                return searchTerms.some(term => headerStr.includes(term.toLowerCase()));
+            });
+        }
+
+        function getProjectStatus(completion, timeElapsed) {
+            const difference = completion - timeElapsed;
+            if (difference > 5) return 'متقدم';
+            if (difference >= -5) return 'في الموعد';
+            return 'متأخر';
+        }
+
+        function populateFilterDropdown(elementId, options) {
+            const select = document.getElementById(elementId);
+            options.forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option;
+                optionElement.textContent = option;
+                select.appendChild(optionElement);
+            });
+        }
+
+        function showDashboard() {
+            document.getElementById('uploadSection').classList.add('hidden');
+            document.getElementById('dashboardContent').classList.remove('hidden');
+        }
+
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName + 'Content').classList.remove('hidden');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            
+            // Update charts if needed
+            setTimeout(() => {
+                if (tabName === 'category') {
+                    updateCategoryCharts();
+                } else if (tabName === 'vendor') {
+                    updateVendorCharts();
+                }
+            }, 100);
+        }
+
+        function applyFilters() {
+            const dateFilter = document.getElementById('dateFilter').value;
+            const engineerFilter = document.getElementById('engineerFilter').value;
+            const contractTypeFilter = document.getElementById('contractTypeFilter').value;
+
+            filteredData = contractsData.filter(contract => {
+                let matches = true;
+                
+                if (engineerFilter && contract.engineer !== engineerFilter) {
+                    matches = false;
+                }
+                
+                if (contractTypeFilter && 
+                    contract.workType !== contractTypeFilter && 
+                    contract.contractType !== contractTypeFilter) {
+                    matches = false;
+                }
+                
+                return matches;
+            });
+
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            updateSummaryMetrics();
+            updatePerformanceChart();
+            updateContractsTable();
+        }
+
+        function updateSummaryMetrics() {
+            if (filteredData.length === 0) return;
+
+            const totalCompletion = filteredData.reduce((sum, contract) => sum + contract.completion, 0);
+            const totalTimeElapsed = filteredData.reduce((sum, contract) => sum + contract.timeElapsed, 0);
+            const totalDeviation = filteredData.reduce((sum, contract) => sum + contract.deviation, 0);
+            const totalFinancialTarget = filteredData.reduce((sum, contract) => sum + contract.financialTarget, 0);
+            const totalFinancialActual = filteredData.reduce((sum, contract) => sum + contract.financialActual, 0);
+
+            const avgCompletion = totalCompletion / filteredData.length;
+            const avgTimeElapsed = totalTimeElapsed / filteredData.length;
+            const avgDeviation = totalDeviation / filteredData.length;
+            const financialDeviation = totalFinancialActual - totalFinancialTarget;
+
+            // Update gauges
+            updateGauge('completionGauge', avgCompletion);
+            updateGauge('timeGauge', avgTimeElapsed);
+            
+            // Update text values
+            document.getElementById('completionRate').textContent = avgCompletion.toFixed(1) + '%';
+            document.getElementById('timeElapsed').textContent = avgTimeElapsed.toFixed(1) + '%';
+            document.getElementById('deviationRate').textContent = avgDeviation.toFixed(1) + '%';
+            
+            // Update deviation status
+            const deviationStatus = document.getElementById('deviationStatus');
+            if (avgDeviation > 10) {
+                deviationStatus.textContent = 'انحراف كبير';
+                deviationStatus.className = 'px-3 py-1 rounded-full text-xs font-medium status-danger';
+            } else if (avgDeviation > 5) {
+                deviationStatus.textContent = 'انحراف متوسط';
+                deviationStatus.className = 'px-3 py-1 rounded-full text-xs font-medium status-warning';
+            } else if (avgDeviation < -5) {
+                deviationStatus.textContent = 'متقدم';
+                deviationStatus.className = 'px-3 py-1 rounded-full text-xs font-medium status-excellent';
+            } else {
+                deviationStatus.textContent = 'متوازن';
+                deviationStatus.className = 'px-3 py-1 rounded-full text-xs font-medium status-good';
+            }
+
+            // Update financial indicators
+            document.getElementById('targetFinancial').textContent = totalFinancialTarget.toLocaleString() + ' ر.س';
+            document.getElementById('actualFinancial').textContent = totalFinancialActual.toLocaleString() + ' ر.س';
+            
+            const financialDeviationElement = document.getElementById('financialDeviation');
+            financialDeviationElement.textContent = financialDeviation.toLocaleString() + ' ر.س';
+            financialDeviationElement.className = financialDeviation >= 0 ? 'font-bold text-green-600' : 'font-bold text-red-600';
+        }
+
+        function updateGauge(gaugeId, percentage) {
+            const gauge = document.getElementById(gaugeId);
+            const circumference = 2 * Math.PI * 70 * 0.5; // Half circle
+            const offset = circumference - (percentage / 100) * circumference;
+            
+            gauge.style.strokeDasharray = circumference;
+            gauge.style.strokeDashoffset = offset;
+        }
+
+        function updatePerformanceChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            if (charts.performance) {
+                charts.performance.destroy();
+            }
+
+            const contractorData = {};
+            filteredData.forEach(contract => {
+                if (!contractorData[contract.contractor]) {
+                    contractorData[contract.contractor] = {
+                        completion: [],
+                        timeElapsed: []
+                    };
+                }
+                contractorData[contract.contractor].completion.push(contract.completion);
+                contractorData[contract.contractor].timeElapsed.push(contract.timeElapsed);
+            });
+
+            const labels = Object.keys(contractorData);
+            const completionData = labels.map(contractor => {
+                const completions = contractorData[contractor].completion;
+                return completions.reduce((sum, val) => sum + val, 0) / completions.length;
+            });
+            const timeElapsedData = labels.map(contractor => {
+                const timeElapsed = contractorData[contractor].timeElapsed;
+                return timeElapsed.reduce((sum, val) => sum + val, 0) / timeElapsed.length;
+            });
+
+            charts.performance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'نسبة الإنجاز',
+                        data: completionData,
+                        backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 2
+                    }, {
+                        label: 'نسبة المدة المنقضية',
+                        data: timeElapsedData,
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateCategoryCharts() {
+            updateWorkTypeChart();
+            updateContractTypeChart();
+            updateCategoryTable();
+        }
+
+        function updateWorkTypeChart() {
+            const ctx = document.getElementById('workTypeChart').getContext('2d');
+            
+            if (charts.workType) {
+                charts.workType.destroy();
+            }
+
+            const workTypeData = {};
+            filteredData.forEach(contract => {
+                if (!workTypeData[contract.workType]) {
+                    workTypeData[contract.workType] = {
+                        count: 0,
+                        totalCompletion: 0,
+                        totalDeviation: 0
+                    };
+                }
+                workTypeData[contract.workType].count++;
+                workTypeData[contract.workType].totalCompletion += contract.completion;
+                workTypeData[contract.workType].totalDeviation += contract.deviation;
+            });
+
+            const labels = Object.keys(workTypeData);
+            const completionData = labels.map(type => 
+                workTypeData[type].totalCompletion / workTypeData[type].count
+            );
+
+            charts.workType = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: completionData,
+                        backgroundColor: [
+                            'rgba(34, 197, 94, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(168, 85, 247, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(239, 68, 68, 0.8)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateContractTypeChart() {
+            const ctx = document.getElementById('contractTypeChart').getContext('2d');
+            
+            if (charts.contractType) {
+                charts.contractType.destroy();
+            }
+
+            const contractTypeData = {};
+            filteredData.forEach(contract => {
+                if (!contractTypeData[contract.contractType]) {
+                    contractTypeData[contract.contractType] = {
+                        count: 0,
+                        totalCompletion: 0
+                    };
+                }
+                contractTypeData[contract.contractType].count++;
+                contractTypeData[contract.contractType].totalCompletion += contract.completion;
+            });
+
+            const labels = Object.keys(contractTypeData);
+            const data = labels.map(type => contractTypeData[type].count);
+
+            charts.contractType = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            'rgba(99, 102, 241, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(245, 101, 101, 0.8)',
+                            'rgba(251, 191, 36, 0.8)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateCategoryTable() {
+            const tableBody = document.getElementById('categoryTableBody');
+            tableBody.innerHTML = '';
+
+            const categoryData = {};
+            
+            // Group by work type
+            filteredData.forEach(contract => {
+                const key = contract.workType;
+                if (!categoryData[key]) {
+                    categoryData[key] = {
+                        count: 0,
+                        totalCompletion: 0,
+                        totalTimeElapsed: 0,
+                        totalDeviation: 0,
+                        totalFinancial: 0
+                    };
+                }
+                categoryData[key].count++;
+                categoryData[key].totalCompletion += contract.completion;
+                categoryData[key].totalTimeElapsed += contract.timeElapsed;
+                categoryData[key].totalDeviation += contract.deviation;
+                categoryData[key].totalFinancial += contract.financialActual;
+            });
+
+            Object.entries(categoryData).forEach(([category, data]) => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-gray-100 hover:bg-gray-50';
+                
+                const avgCompletion = data.totalCompletion / data.count;
+                const avgTimeElapsed = data.totalTimeElapsed / data.count;
+                const avgDeviation = data.totalDeviation / data.count;
+                
+                row.innerHTML = `
+                    <td class="py-4 px-4 font-medium text-gray-800">${category}</td>
+                    <td class="py-4 px-4 text-gray-600">${data.count}</td>
+                    <td class="py-4 px-4">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-16 bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: ${avgCompletion}%"></div>
+                            </div>
+                            <span class="text-sm text-gray-600">${avgCompletion.toFixed(1)}%</span>
+                        </div>
+                    </td>
+                    <td class="py-4 px-4">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-16 bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: ${avgTimeElapsed}%"></div>
+                            </div>
+                            <span class="text-sm text-gray-600">${avgTimeElapsed.toFixed(1)}%</span>
+                        </div>
+                    </td>
+                    <td class="py-4 px-4">
+                        <span class="font-medium ${avgDeviation >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            ${avgDeviation.toFixed(1)}%
+                        </span>
+                    </td>
+                    <td class="py-4 px-4 text-gray-600">${data.totalFinancial.toLocaleString()} ر.س</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        function updateVendorCharts() {
+            updateVendorMetrics();
+            updateVendorChart();
+        }
+
+        function updateVendorMetrics() {
+            let advanced = 0, onTime = 0, delayed = 0;
+            
+            filteredData.forEach(contract => {
+                if (contract.status === 'متقدم') advanced++;
+                else if (contract.status === 'في الموعد') onTime++;
+                else if (contract.status === 'متأخر') delayed++;
+            });
+
+            document.getElementById('advancedVendors').textContent = advanced;
+            document.getElementById('onTimeVendors').textContent = onTime;
+            document.getElementById('delayedVendors').textContent = delayed;
+        }
+
+        function updateVendorChart() {
+            const ctx = document.getElementById('vendorChart').getContext('2d');
+            
+            if (charts.vendor) {
+                charts.vendor.destroy();
+            }
+
+            const vendorData = {};
+            filteredData.forEach(contract => {
+                if (!vendorData[contract.contractor]) {
+                    vendorData[contract.contractor] = {
+                        completion: 0,
+                        timeElapsed: 0,
+                        deviation: 0,
+                        count: 0
+                    };
+                }
+                vendorData[contract.contractor].completion += contract.completion;
+                vendorData[contract.contractor].timeElapsed += contract.timeElapsed;
+                vendorData[contract.contractor].deviation += contract.deviation;
+                vendorData[contract.contractor].count++;
+            });
+
+            const labels = Object.keys(vendorData);
+            const completionData = labels.map(vendor => 
+                vendorData[vendor].completion / vendorData[vendor].count
+            );
+            const deviationData = labels.map(vendor => 
+                vendorData[vendor].deviation / vendorData[vendor].count
+            );
+
+            charts.vendor = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'أداء المقاولين',
+                        data: labels.map((vendor, index) => ({
+                            x: completionData[index],
+                            y: deviationData[index],
+                            label: vendor
+                        })),
+                        backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 2,
+                        pointRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.raw.label}: الإنجاز ${context.parsed.x.toFixed(1)}%, الانحراف ${context.parsed.y.toFixed(1)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'نسبة الإنجاز (%)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'معدل الانحراف (%)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateContractsTable() {
+            const tableBody = document.getElementById('contractsTableBody');
+            tableBody.innerHTML = '';
+
+            if (filteredData.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">لا توجد بيانات</td></tr>';
+                return;
+            }
+
+            filteredData.forEach(contract => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-gray-100 hover:bg-gray-50';
+                
+                const statusClass = getStatusClass(contract.status);
+                
+                row.innerHTML = `
+                    <td class="py-4 px-4 font-medium text-gray-800">${contract.contractNumber}</td>
+                    <td class="py-4 px-4 text-gray-700">${contract.projectName}</td>
+                    <td class="py-4 px-4 text-gray-600">${contract.contractor}</td>
+                    <td class="py-4 px-4">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-16 bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: ${contract.completion}%"></div>
+                            </div>
+                            <span class="text-sm text-gray-600">${contract.completion.toFixed(1)}%</span>
+                        </div>
+                    </td>
+                    <td class="py-4 px-4">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-16 bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: ${contract.timeElapsed}%"></div>
+                            </div>
+                            <span class="text-sm text-gray-600">${contract.timeElapsed.toFixed(1)}%</span>
+                        </div>
+                    </td>
+                    <td class="py-4 px-4">
+                        <span class="font-medium ${contract.deviation >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            ${contract.deviation.toFixed(1)}%
+                        </span>
+                    </td>
+                    <td class="py-4 px-4 text-gray-600">${contract.engineer}</td>
+                    <td class="py-4 px-4">
+                        <span class="px-3 py-1 rounded-full text-xs font-medium ${statusClass}">
+                            ${contract.status}
+                        </span>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        function getStatusClass(status) {
+            const classes = {
+                'متقدم': 'status-excellent',
+                'في الموعد': 'status-good',
+                'متأخر': 'status-danger'
+            };
+            return classes[status] || 'status-good';
+        }
+
+        function exportToGoogleSheets() {
+            // Create export data
+            const exportData = [
+                ['رقم العقد', 'اسم المشروع', 'المقاول', 'نسبة الإنجاز', 'نسبة المدة المنقضية', 'معدل الانحراف', 'المؤشر المالي المستهدف', 'المؤشر المالي الفعلي', 'المهندس المشرف', 'نوع العمل', 'الحالة']
+            ];
+            
+            filteredData.forEach(contract => {
+                exportData.push([
+                    contract.contractNumber,
+                    contract.projectName,
+                    contract.contractor,
+                    contract.completion,
+                    contract.timeElapsed,
+                    contract.deviation,
+                    contract.financialTarget,
+                    contract.financialActual,
+                    contract.engineer,
+                    contract.workType,
+                    contract.status
+                ]);
+            });
+            
+            const ws = XLSX.utils.aoa_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'تقرير الأداء');
+            
+            XLSX.writeFile(wb, `تقرير_أداء_العقود_${new Date().toISOString().split('T')[0]}.xlsx`);
+        }
+
+        function exportContractsData() {
+            exportToGoogleSheets();
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98ab5ad9276197e8',t:'MTc1OTgxODY3OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
+"إضافة لوحة متابعة العقود"
